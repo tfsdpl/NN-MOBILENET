@@ -154,8 +154,7 @@ def get_args_parser():
     parser.add_argument('--fold_test', default='kfold_csv/test_fold_1.csv',
                         help='path where to save, empty for no saving')
     
-    parser.add_argument('--log_dir', default='Experiment/3/log',
-                        help='path where to tensorboard log')
+    parser.add_argument('--log_dir', default='Experiment/3/log', help='path where to tensorboard log')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=0, type=int)
@@ -204,8 +203,6 @@ def get_args_parser():
 
 
 def main(args):
-    utils.init_distributed_mode(args)
-    print(args)
     device = torch.device(args.device)
 
     # fix the seed for reproducibility
@@ -215,11 +212,7 @@ def main(args):
     cudnn.benchmark = True
 
     dataset_train, args.nb_classes = build_dataset(is_train=True, args=args)
-    if args.disable_eval:
-        args.dist_eval = False
-        dataset_val = None
-    else:
-        dataset_val, _ = build_dataset(is_train=False, args=args)
+    dataset_val, _ = build_dataset(is_train=False, args=args)
 
     num_tasks = utils.get_world_size()
     global_rank = utils.get_rank()
@@ -228,15 +221,7 @@ def main(args):
         dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True, seed=args.seed,
     )
     print("Sampler_train = %s" % str(sampler_train))
-    if args.dist_eval:
-        if len(dataset_val) % num_tasks != 0:
-            print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
-                    'This will slightly alter validation results as extra duplicate entries are added to achieve '
-                    'equal num of samples per-process.')
-        sampler_val = torch.utils.data.DistributedSampler(
-            dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)
-    else:
-        sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+    sampler_val = torch.utils.data.DistributedSampler(dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)
 
     if global_rank == 0 and args.log_dir is not None:
         os.makedirs(args.log_dir, exist_ok=True)
@@ -268,14 +253,10 @@ def main(args):
     else:
         data_loader_val = None
 
-    mixup_fn = None
-    mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
-    if mixup_active:
-        print("Mixup is activated!")
-        mixup_fn = Mixup(
-            mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-            label_smoothing=args.smoothing, num_classes=args.nb_classes)
+    mixup_fn = Mixup(
+        mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
+        prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
+        label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     model = ReXNetV1(width_mult=3.0,classes=args.nb_classes,dropout_path=args.drop_path)
     model.load_state_dict(torch.load('rexnet_3.0.pth'),strict=False)
@@ -283,15 +264,13 @@ def main(args):
 
     model.to(device)
 
-    model_ema = None
-    if args.model_ema:
-        # Important to create EMA model after cuda(), DP wrapper, and AMP but before SyncBN and DDP wrapper
-        model_ema = ModelEma(
-            model,
-            decay=args.model_ema_decay,
-            device='cpu' if args.model_ema_force_cpu else '',
-            resume='')
-        print("Using EMA with decay = %.8f" % args.model_ema_decay)
+
+    model_ema = ModelEma(
+        model,
+        decay=0.9999,
+        device='',
+        resume='')
+    print("Using EMA with decay = %.8f" % args.model_ema_decay)
 
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -318,10 +297,6 @@ def main(args):
     if assigner is not None:
         print("Assigned values = %s" % str(assigner.values))
 
-    if args.distributed:
-        print(args.gpu)
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=False)
-        model_without_ddp = model.module
 
     optimizer = create_optimizer(
         args, model_without_ddp, skip_list=None,
@@ -370,9 +345,7 @@ def main(args):
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         print(epoch)
-        
-        if args.distributed:
-            data_loader_train.sampler.set_epoch(epoch)
+
         if log_writer is not None:
             log_writer.set_step(epoch * num_training_steps_per_epoch * args.update_freq)
         if wandb_logger:
@@ -540,5 +513,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('retinal dataset training and evaluation script', parents=[get_args_parser()])
     args = parser.parse_args()
     if args.output_dir:
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+        Path('Experiment/3').mkdir(parents=True, exist_ok=True)
+    print(args)
     main(args)

@@ -1,11 +1,6 @@
 import os
 from torchvision import datasets, transforms
-from dataloader.Eyepacs import Eyepacs
-from dataloader.Messidor import Messidor1Dataset,Messidor2Dataset
 from dataloader.Apots import Apots
-from dataloader.RFMid import RFMiD
-from dataloader.Rsnr import RSNR
-from dataloader.MICCAI import MICCAI
 from timm.data.constants import \
     IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
 from timm.data import create_transform
@@ -34,28 +29,24 @@ def build_dataset(is_train, args):
 
 
 def build_transform(is_train, args):
-    resize_im = args.input_size > 32
-    input_size = args.input_size
+    resize_im = True
     imagenet_default_mean_and_std = args.imagenet_default_mean_and_std
     mean = IMAGENET_INCEPTION_MEAN if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_MEAN
     std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
 
     if is_train:
         transform = create_transform(
-            input_size=args.input_size,
+            input_size=244,
             is_training=True,
             color_jitter=min(args.color_jitter, 0.5),  # Garantir que hue_factor não ultrapasse 0.5
-            auto_augment=args.aa,
-            interpolation=args.train_interpolation,
-            re_prob=args.reprob,
-            re_mode=args.remode,
-            re_count=args.recount,
+            auto_augment='rand-m9-mstd0.5-inc1',
+            interpolation='bicubic',
+            re_prob=0.25,
+            re_mode='pixel',
+            re_count=1,
             mean=mean,
             std=std,
         )
-        if not resize_im:
-            transform.transforms[0] = transforms.RandomCrop(
-                args.input_size, padding=4)
         return transform
     else:
         t = []
