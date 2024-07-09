@@ -16,6 +16,8 @@ from timm.data.mixup import Mixup
 from timm.models import create_model
 from timm.loss import LabelSmoothingCrossEntropy,SoftTargetCrossEntropy
 from timm.utils import ModelEma
+
+import config
 from optim_factory import create_optimizer, LayerDecayValueAssigner
 
 
@@ -203,29 +205,28 @@ def get_args_parser():
 
 
 def main(args):
-    device = torch.device(args.device)
+    device = torch.device(config.DEVICE)
 
-    # fix the seed for reproducibility
-    seed = args.seed + utils.get_rank()
+    seed = config.SEED + utils.get_rank()
     torch.manual_seed(seed)
     np.random.seed(seed)
     cudnn.benchmark = True
 
-    dataset_train, args.nb_classes = build_dataset(is_train=True, args=args)
-    dataset_val, _ = build_dataset(is_train=False, args=args)
+    dataset_train = build_dataset(is_train=True)
+    dataset_val = build_dataset(is_train=False)
 
     num_tasks = utils.get_world_size()
     global_rank = utils.get_rank()
 
     sampler_train = torch.utils.data.DistributedSampler(
-        dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True, seed=args.seed,
+        dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True, seed=config.SEED
     )
     print("Sampler_train = %s" % str(sampler_train))
     sampler_val = torch.utils.data.DistributedSampler(dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)
 
-    if global_rank == 0 and args.log_dir is not None:
-        os.makedirs(args.log_dir, exist_ok=True)
-        log_writer = utils.TensorboardLogger(log_dir=args.log_dir)
+    if global_rank == 0 and config.LOG_DIR is not None:
+        os.makedirs(config.LOG_DIR, exist_ok=True)
+        log_writer = utils.TensorboardLogger(log_dir=config.LOG_DIR)
     else:
         log_writer = None
 
@@ -253,12 +254,14 @@ def main(args):
     else:
         data_loader_val = None
 
-    mixup_fn = Mixup(
-        mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-        prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-        label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
-    model = ReXNetV1(width_mult=3.0,classes=args.nb_classes,dropout_path=args.drop_path)
+    mixup_fn = Mixup(
+        mixup_alpha=config.MIXUP, cutmix_alpha=config.CUTMIX, cutmix_minmax=config.CUTMIX_MINMAX,
+        prob=config.MIXUP_SWITCH_PROB, switch_prob=config.MIXUP_SWITCH_PROB, mode=config.MIXUP_MODE,
+        label_smoothing=config.SMOOTHING, num_classes=config.NUM_CLASSES)
+
+
+    model = ReXNetV1(width_mult=3.0,classes=config.NUM_CLASSES,dropout_path=args.drop_path)
     model.load_state_dict(torch.load('rexnet_3.0.pth'),strict=False)
 
 
@@ -512,7 +515,5 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('retinal dataset training and evaluation script', parents=[get_args_parser()])
     args = parser.parse_args()
-    if args.output_dir:
-        Path('Experiment/3').mkdir(parents=True, exist_ok=True)
-    print(args)
+    Path(config.LOG_DIR).mkdir(parents=True, exist_ok=True)
     main(args)
