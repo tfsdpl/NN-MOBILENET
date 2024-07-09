@@ -317,14 +317,14 @@ def main(args):
     if args.weight_decay_end is None:
         args.weight_decay_end = args.weight_decay
     wd_schedule_values = utils.cosine_scheduler(
-        args.weight_decay, args.weight_decay_end, args.epochs, num_training_steps_per_epoch)
+        config.WEIGHT_DECAY, config.WEIGHT_DECAY_END, config.EPOCHS, num_training_steps_per_epoch)
     print("Max WD = %.7f, Min WD = %.7f" % (max(wd_schedule_values), min(wd_schedule_values)))
 
     if mixup_fn is not None:
         # smoothing is handled with mixup label transform
         criterion = SoftTargetCrossEntropy()
-    elif args.smoothing > 0.:
-        criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+    elif config.SMOOTHING > 0.:
+        criterion = LabelSmoothingCrossEntropy(smoothing=config.SMOOTHING)
     else:
         criterion = torch.nn.CrossEntropyLoss()
 
