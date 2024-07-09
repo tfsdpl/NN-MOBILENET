@@ -1,9 +1,7 @@
-from PIL import Image
-import numpy as np
-import pandas as pd
 import os
-from glob import glob
-from torch.utils import data
+import pandas as pd
+import numpy as np
+from PIL import Image
 from torch.utils.data import Dataset
 
 
@@ -15,10 +13,9 @@ class Apots(Dataset):
         self.image_all = data.iloc[:, 0].values
         self.label_all = data.iloc[:, 1].values
         print(data)
+
     def __getitem__(self, idx):
-        #print(self.image_all[idx])
         image_name = str(self.image_all[idx])
-        #print(self.data.iloc[idx, 0])
         label = self.label_all[idx]
 
         image_dir = os.path.join(self.image_dir, image_name)
@@ -30,11 +27,10 @@ class Apots(Dataset):
         label_onehot = np.zeros(5)
         label_onehot[label] = 1
 
-        return x, label_onehot,label
+        return x, label_onehot, label
 
     def get_labels(self):
         return self.label_all
 
     def __len__(self):
         return len(self.label_all)
-

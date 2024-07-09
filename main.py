@@ -211,9 +211,11 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     cudnn.benchmark = True
+    #
+    # dataset_train = build_dataset(is_train=True)
+    # dataset_val = build_dataset(is_train=False)
 
-    dataset_train = build_dataset(is_train=True)
-    dataset_val = build_dataset(is_train=False)
+    dataset_train, dataset_test, dataset_val = build_dataset('dataset/APTOS/train.csv', 'dataset/APTOS/train')
 
     num_tasks = utils.get_world_size()
     global_rank = utils.get_rank()
@@ -344,9 +346,9 @@ def main(args):
     if args.model_ema and args.model_ema_eval:
         max_accuracy_ema = 0.0
 
-    print("Start training for %d epochs" % args.epochs)
+    print("Start training for %d epochs" % config.EPOCHS)
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(args.start_epoch, config.EPOCHS):
         print(epoch)
 
         if log_writer is not None:
