@@ -5,7 +5,7 @@ from collections import defaultdict, deque
 import datetime
 import numpy as np
 from timm.utils import get_state_dict
-
+import config
 from pathlib import Path
 
 import torch
@@ -404,7 +404,7 @@ def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epoch
     return schedule
 
 def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, model_ema=None):
-    output_dir = Path(args.output_dir)
+    output_dir = Path(config.LOG_DIR)
     epoch_name = str(epoch)
     checkpoint_paths = [output_dir / ('checkpoint-%s.pth' % epoch_name)]
     for checkpoint_path in checkpoint_paths:
